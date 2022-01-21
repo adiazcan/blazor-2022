@@ -1,0 +1,36 @@
+﻿@page "/userprofile"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@attribute [Authorize]
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<h4>User Profile</h4>
+
+@if (apiData == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <tbody>
+            @foreach (var data in apiData)
+            {
+                <tr>
+                    <td>@data</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string[] apiData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        apiData = await Http.GetFromJsonAsync<string[]>("api/Graph/UserProfile");
+    }
+
+}

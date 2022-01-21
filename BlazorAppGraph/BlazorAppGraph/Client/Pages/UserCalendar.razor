@@ -1,0 +1,107 @@
+﻿@page "/usercalendar"
+@using BlazorAppGraph.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@attribute [Authorize]
+@inject HttpClient Http
+
+<h4>Calendar Events</h4>
+
+<Validations StatusChanged="@OnStatusChanged">
+    <Validation Validator="@ValidateEmail"  >
+        <TextEdit Placeholder="Enter email" @bind-Text="userCalendarDataModel.Email" >
+            <Feedback>
+                <ValidationNone>Please enter the email.</ValidationNone>
+                <ValidationSuccess>Email is good.</ValidationSuccess>
+                <ValidationError>Enter valid email!</ValidationError>
+            </Feedback>
+        </TextEdit>
+    </Validation>
+
+    <Field Horizontal="true">
+        <FieldLabel ColumnSize="ColumnSize.IsFull.OnTablet.Is2.OnDesktop">From</FieldLabel>
+        <FieldBody ColumnSize="ColumnSize.IsFull.OnTablet.Is10.OnDesktop">
+            <DateEdit TValue="DateTime?" InputMode="DateInputMode.DateTime" @bind-Date="userCalendarDataModel.From" />
+        </FieldBody>
+    </Field>
+
+    <Field Horizontal="true">
+        <FieldLabel ColumnSize="ColumnSize.IsFull.OnTablet.Is2.OnDesktop">To</FieldLabel>
+        <FieldBody ColumnSize="ColumnSize.IsFull.OnTablet.Is10.OnDesktop">
+            <DateEdit TValue="DateTime?" InputMode="DateInputMode.DateTime" @bind-Date="userCalendarDataModel.To" />
+        </FieldBody>
+    </Field>
+
+    <br />
+    <Button Color="Color.Primary" Disabled="@saveDisabled" PreventDefaultOnSubmit="true" Clicked="@Submit">Get calendar events for user</Button>
+</Validations>
+
+ <br /><br />
+
+@if (filteredEvents == null)
+{
+    <p><em>@noDataResult</em></p>
+}
+else
+{
+    <DataGrid TItem="FilteredEventDto"
+              Data="@filteredEvents" Bordered="true"
+              @bind-SelectedRow="@selectedFilteredEvent" PageSize=15
+              Responsive>
+        <DataGridCommandColumn TItem="FilteredEventDto" />
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.Subject)" Caption="Subject" Sortable="true" />
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.Start)" Caption="Start" Editable="false" />
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.End)" Caption="End" Editable="false" />
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.Sensitivity)" Caption="Sensitivity" Editable="false"/>
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.IsAllDay)" Caption="IsAllDay" Editable="false"/>
+        <DataGridColumn TItem="FilteredEventDto" Field="@nameof(FilteredEventDto.ShowAs)" Caption="ShowAs" Editable="false"/>
+    </DataGrid>
+}
+
+@code {
+    private List<FilteredEventDto> filteredEvents;
+    private UserCalendarDataModel userCalendarDataModel { get; set; } = new UserCalendarDataModel()
+    {
+        From = DateTime.UtcNow.AddDays(-7.0),
+        To = DateTime.UtcNow.AddDays(7.0)
+    };
+
+    private FilteredEventDto selectedFilteredEvent;
+    private string noDataResult { get; set; } = "no data";
+    bool saveDisabled = true;
+
+    Task OnStatusChanged( ValidationsStatusChangedEventArgs eventArgs )
+    {
+        saveDisabled = eventArgs.Status != ValidationStatus.Success;
+
+        return Task.CompletedTask;
+    }
+
+    void ValidateEmail( ValidatorEventArgs e )
+    {
+        var email = Convert.ToString( e.Value );
+
+        e.Status = string.IsNullOrEmpty( email ) ? ValidationStatus.None :
+             email.Contains( "@" ) ? ValidationStatus.Success : ValidationStatus.Error;
+    }
+
+    async Task Submit()
+    {
+        await PostData(userCalendarDataModel);
+    }
+
+    private async Task PostData(UserCalendarDataModel userCalendarDataModel)
+    {
+        var response = await Http.PostAsJsonAsync<UserCalendarDataModel>("api/Graph/UserCalendar", userCalendarDataModel);
+        if(response.IsSuccessStatusCode)
+        {
+            filteredEvents = await response.Content.ReadFromJsonAsync<List<FilteredEventDto>>();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            filteredEvents = null;
+            noDataResult = error;
+        }
+    }
+}
